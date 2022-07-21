@@ -1,9 +1,18 @@
 #include <Process.h>
+#include <SolarCalculator.h>
+#include <TimeLib.h>
 
 // process used to get the date
 Process date;
+// geolocation
+const double latitude = 41.7;
+const double longitude = 2.17;
+int utc_offset = 2;
+// refresh interval, in seconds
+int interval = 5;
 
-// Python equivalent split function
+
+// python equivalent split function
 String split(String data, char separator, int index) {
     int found = 0;
     int strIndex[] = { 0, -1 };
@@ -19,6 +28,13 @@ String split(String data, char separator, int index) {
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
+
+// converts the time to UTC given a UTC offset
+time_t to_utc(time_t local) {
+  return local - long(utc_offset * 3600);
+}
+
+
 // get time function, given the time in a String format
 void get_time(String data) {
   int year = split(data, ':', 0).toInt();
@@ -27,7 +43,10 @@ void get_time(String data) {
   int hour = split(data, ':', 3).toInt();
   int minute = split(data, ':', 4).toInt();
   int second = split(data, ':', 5).toInt();
+  // set time manually (hour, minute, second, day, month, year)
+  setTime(hour, minute, second, day, month, year);
 }
+
 
 void setup() {
   // initialize Bridge
@@ -39,18 +58,30 @@ void setup() {
   Serial.println("Initializing...");
 }
 
+
 void loop() {
-  // begin date
-  date.begin("/bin/date");
-  // time format
-  date.addParameter("+%Y:%m:%d:%H:%M:%S");
-  date.run();
-  
-  // if there's a result from the date process, get it.
-  while (date.available() > 0) {
-    // get the time
-    get_time(date.readString());
+  static unsigned long next_millis = 0;
+  // at every interval
+  if (millis() > next_millis) {
+    // begin date
+    date.begin("/bin/date");
+    // time format
+    date.addParameter("+%Y:%m:%d:%H:%M:%S");
+    date.run();
+    // if there's a result from the date process, get it.
+    while (date.available() > 0) {
+      // get the time
+      get_time(date.readString());
+      // get time in UNIX timestamp
+      time_t utc = to_utc(now());
+      // define output variables
+      double az, elevation;
+      // calculate the solar position, in degrees
+      calcHorizontalCoordinates(utc, latitude, longitude, az, elevation);
+      Serial.println(elevation);
+      // time control
+      next_millis = millis() + interval * 1000;
+    }
   }
   
-  delay(5000); // wait 5000ms
 }
