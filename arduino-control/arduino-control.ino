@@ -1,6 +1,8 @@
 #include <Process.h>
 #include <SolarCalculator.h>
 #include <TimeLib.h>
+#include <Adafruit_NeoPixel.h>
+
 
 // process used to get the date
 Process date;
