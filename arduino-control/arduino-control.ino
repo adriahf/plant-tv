@@ -17,6 +17,8 @@ int pin = 6;
 int num_pixels = 24;
 // build Neopixel object
 Adafruit_NeoPixel pixels(num_pixels, pin, NEO_GRB + NEO_KHZ800);
+// global variables for RGB colors
+int r, g, b;
 
 // python equivalent split function
 String split(String data, char separator, int index) {
@@ -54,23 +56,64 @@ void get_time(String data) {
 }
 
 
+void get_light(float elevation) {
+  /*
+  * No Sun     [elevation -18] (5, 0, 3)
+  * CCT 1000 K [elevation -10] (255, 30, 0)
+  * CCT 1800 K [elevation 0]   (255, 70, 0)
+  * CCT 2400 K [elevation 5]   (255, 100, 0)
+  * CCT 3000 K [elevation 10]  (255, 120, 10)
+  * CCT 3500 K [elevation 15]  (255, 130, 25)
+  * CCT 4000 K [elevation 20]  (255, 140, 35)
+  * CCT 5000 K [elevation 25]  (255, 160, 50)
+  * CCT 6000 K [elevation 40]  (255, 160, 73)
+  */
+  // define variables to get the RGB values
+  // number of datapoints
+  int data_points = 9;
+  // sun_elevation, r, g and b datapoints
+  int sun_elevations[data_points] = {-18, -10, 0, 5, 10, 15, 20, 25, 40};
+  int rs[data_points] = {5, 255, 255, 255, 255, 255, 255, 255, 255};
+  int gs[data_points] = {0, 30, 70, 100, 120, 130, 140, 160, 160};
+  int bs[data_points] = {3, 0, 0, 0, 10, 25, 35, 50, 73};
+  // get the lowest datapoint closest to the elevation 
+  int elevation_index = 0;
+  for (int i = 0; i < data_points - 1; i++) {
+    if (elevation > sun_elevations[i]) {
+      elevation_index = i + 1;
+    }
+  }
+  // if elevation if below the lowest datapoint
+  if (elevation <= sun_elevations[0]) {
+    r = rs[0];
+    g = gs[0];
+    b = bs[0];
+  }
+  else {
+    // if elevation is somewhere in the middle
+    if (elevation <= sun_elevations[elevation_index]) {
+      // interpolate the RGB values
+      r = map(elevation, sun_elevations[elevation_index-1], sun_elevations[elevation_index], rs[elevation_index-1], rs[elevation_index]);
+      g = map(elevation, sun_elevations[elevation_index-1], sun_elevations[elevation_index], gs[elevation_index-1], gs[elevation_index]);
+      b = map(elevation, sun_elevations[elevation_index-1], sun_elevations[elevation_index], bs[elevation_index-1], bs[elevation_index]);
+    }
+    // if elevation is above the highest datapoint
+    else {
+      r = rs[data_points-1];
+      g = gs[data_points-1];
+      b = bs[data_points-1];
+    }
+  }
+}
+
+
 // emit light function
 void emit_light(float elevation) {
-  /*
-   * No Sun     (5, 0, 3)
-   * CCT 1000 K (255, 30, 0)
-   * CCT 1800 K (255, 70, 0)
-   * CCT 2400 K (255, 100, 0)
-   * CCT 3000 K (255, 120, 10)
-   * CCT 3500 K (255, 130, 25)
-   * CCT 4000 K (255, 140, 35)
-   * CCT 5000 K (255, 160, 50)
-   * CCT 6000 K (255, 160, 73)
-   */
+  get_light(elevation);
   // for every pixel
-  for (int i=0; i<num_pixels; i++) {
+  for (int i = 0; i < num_pixels; i++) {
     // set RGB color (from 0 to 255)
-    pixels.setPixelColor(i, pixels.Color(255, 160, 73));
+    pixels.setPixelColor(i, pixels.Color(r, g, b));
   }
   // send the updated pixel colors to the hardware
   pixels.show();
@@ -111,7 +154,6 @@ void loop() {
       double az, elevation;
       // calculate the solar position, in degrees
       calcHorizontalCoordinates(utc, latitude, longitude, az, elevation);
-      Serial.println(elevation);
       // emit light
       emit_light(elevation);
       // time control
