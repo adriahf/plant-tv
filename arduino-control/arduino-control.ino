@@ -12,7 +12,11 @@ const double longitude = 2.17;
 int utc_offset = 2;
 // refresh interval, in seconds
 int interval = 5;
-
+// define data pin connected to the light
+int pin = 6;
+int num_pixels = 24;
+// build Neopixel object
+Adafruit_NeoPixel pixels(num_pixels, pin, NEO_GRB + NEO_KHZ800);
 
 // python equivalent split function
 String split(String data, char separator, int index) {
@@ -50,7 +54,32 @@ void get_time(String data) {
 }
 
 
+// emit light function
+void emit_light(float elevation) {
+  /*
+   * No Sun     (5, 0, 3)
+   * CCT 1000 K (255, 30, 0)
+   * CCT 1800 K (255, 70, 0)
+   * CCT 2400 K (255, 100, 0)
+   * CCT 3000 K (255, 120, 10)
+   * CCT 3500 K (255, 130, 25)
+   * CCT 4000 K (255, 140, 35)
+   * CCT 5000 K (255, 160, 50)
+   * CCT 6000 K (255, 160, 73)
+   */
+  // for every pixel
+  for (int i=0; i<num_pixels; i++) {
+    // set RGB color (from 0 to 255)
+    pixels.setPixelColor(i, pixels.Color(255, 160, 73));
+  }
+  // send the updated pixel colors to the hardware
+  pixels.show();
+}
+
+
 void setup() {
+  // initialize Neopixel object
+  pixels.begin();
   // initialize Bridge
   Bridge.begin();
   // initialize serial 
@@ -62,6 +91,8 @@ void setup() {
 
 
 void loop() {
+  // set all pixel colors to 0
+  pixels.clear();
   static unsigned long next_millis = 0;
   // at every interval
   if (millis() > next_millis) {
@@ -81,9 +112,10 @@ void loop() {
       // calculate the solar position, in degrees
       calcHorizontalCoordinates(utc, latitude, longitude, az, elevation);
       Serial.println(elevation);
+      // emit light
+      emit_light(elevation);
       // time control
       next_millis = millis() + interval * 1000;
     }
   }
-  
 }
