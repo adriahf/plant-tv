@@ -20,6 +20,7 @@ Adafruit_NeoPixel pixels(num_pixels, pin, NEO_GRB + NEO_KHZ800);
 // global variables for RGB colors
 int r, g, b;
 
+
 // python equivalent split function
 String split(String data, char separator, int index) {
     int found = 0;
@@ -53,6 +54,15 @@ void get_time(String data) {
   int second = split(data, ':', 5).toInt();
   // set time manually (hour, minute, second, day, month, year)
   setTime(hour, minute, second, day, month, year);
+}
+
+
+float map_float(float val, float from_low, float from_high, float to_low, float to_high) {
+  // slope
+  float m = (to_high - to_low) / (from_high - from_low);
+  // ecuation
+  float y = to_low + m*(val - from_low);
+  return y;
 }
 
 
@@ -93,9 +103,9 @@ void get_light(float elevation) {
     // if elevation is somewhere in the middle
     if (elevation <= sun_elevations[elevation_index]) {
       // interpolate the RGB values
-      r = map(elevation, sun_elevations[elevation_index-1], sun_elevations[elevation_index], rs[elevation_index-1], rs[elevation_index]);
-      g = map(elevation, sun_elevations[elevation_index-1], sun_elevations[elevation_index], gs[elevation_index-1], gs[elevation_index]);
-      b = map(elevation, sun_elevations[elevation_index-1], sun_elevations[elevation_index], bs[elevation_index-1], bs[elevation_index]);
+      r = map_float(elevation, sun_elevations[elevation_index-1], sun_elevations[elevation_index], rs[elevation_index-1], rs[elevation_index]);
+      g = map_float(elevation, sun_elevations[elevation_index-1], sun_elevations[elevation_index], gs[elevation_index-1], gs[elevation_index]);
+      b = map_float(elevation, sun_elevations[elevation_index-1], sun_elevations[elevation_index], bs[elevation_index-1], bs[elevation_index]);
     }
     // if elevation is above the highest datapoint
     else {
@@ -128,7 +138,6 @@ void setup() {
   // initialize serial 
   Serial.begin(9600); 
   // wait for Serial Monitor to open
-  while(!Serial);
   Serial.println("Initializing...");
 }
 
