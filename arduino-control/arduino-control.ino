@@ -1,19 +1,22 @@
-#include <Process.h>
+#include <WiFi.h>
 #include <SolarCalculator.h>
 #include <TimeLib.h>
 #include <Adafruit_NeoPixel.h>
 
+const char* ssid = "ssid";
+const char* password = "pass";
 
-// process used to get the date
-Process date;
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 3600;
+const int   daylightOffset_sec = 3600;
+
 // geolocation
 const double latitude = 41.7;
 const double longitude = 2.17;
-int utc_offset = 2;
 // refresh interval, in seconds
 int interval = 5;
 // define data pin connected to the light
-int pin = 6;
+int pin = 4;
 int num_pixels = 24;
 // build Neopixel object
 Adafruit_NeoPixel pixels(num_pixels, pin, NEO_GRB + NEO_KHZ800);
@@ -35,12 +38,6 @@ String split(String data, char separator, int index) {
         }
     }
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
-}
-
-
-// converts the time to UTC given a UTC offset
-time_t to_utc(time_t local) {
-  return local - long(utc_offset * 3600);
 }
 
 
@@ -130,43 +127,67 @@ void emit_light(float elevation) {
 }
 
 
+void printLocalTime()
+{
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return;
+  }
+  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+}
+
+unsigned long getTime() {
+  time_t now;
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return (0);
+  }
+  time(&now);
+  return now;
+}
+
 void setup() {
+  Serial.begin(115200);
+  
+  //connect to WiFi
+  Serial.printf("Connecting to %s ", ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+  }
+  Serial.println(" CONNECTED");
+  
+  //init and get the time
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  printLocalTime();
+
+  //disconnect WiFi as it's no longer needed
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+  
   // initialize Neopixel object
   pixels.begin();
-  // initialize Bridge
-  Bridge.begin();
-  // initialize serial 
-  Serial.begin(9600); 
-  // wait for Serial Monitor to open
-  Serial.println("Initializing...");
 }
 
 
 void loop() {
   // set all pixel colors to 0
   pixels.clear();
-  static unsigned long next_millis = 0;
+  
   // at every interval
+  static unsigned long next_millis = 0;
   if (millis() > next_millis) {
-    // begin date
-    date.begin("/bin/date");
-    // time format
-    date.addParameter("+%Y:%m:%d:%H:%M:%S");
-    date.run();
-    // if there's a result from the date process, get it.
-    while (date.available() > 0) {
-      // get the time
-      get_time(date.readString());
-      // get time in UNIX timestamp
-      time_t utc = to_utc(now());
-      // define output variables
-      double az, elevation;
-      // calculate the solar position, in degrees
-      calcHorizontalCoordinates(utc, latitude, longitude, az, elevation);
-      // emit light
-      emit_light(elevation);
-      // time control
-      next_millis = millis() + interval * 1000;
-    }
+    unsigned long utc = getTime();
+    // define output variables
+    double az, elevation;
+    // calculate the solar position, in degrees
+    calcHorizontalCoordinates(utc, latitude, longitude, az, elevation);
+    // emit light
+    emit_light(elevation);
+    // time control
+    next_millis = millis() + interval * 1000;
   }
 }
